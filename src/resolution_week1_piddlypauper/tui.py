@@ -1,6 +1,6 @@
 from textual.app import App, ComposeResult
 from textual.containers import HorizontalGroup, VerticalScroll, Horizontal
-from textual.widgets import Button, Static, Footer, Header, ListView, ListItem
+from textual.widgets import Input, Button, Static, Footer, Header, ListView, ListItem
 import json
 import os
 
@@ -24,14 +24,14 @@ class TaskItem(ListItem):
         self.task_data = task_data
     
     def compose(self) -> ComposeResult:
-        yield Static(self.label_text, id="label")
+        yield Static(self.label_text, id="label", markup=False)
     
     # Like a godot export property
     @property 
     def label_text(self) -> str:
         status = "X" if self.task_data["done"] else " "
         # Backslash to escape markdown
-        return f"\[{status}] {self.task_data['id']}: {self.task_data['task']}"
+        return f"[{status}] {self.task_data['id']}: {self.task_data['task']}"
     
     def toggle(self):
         self.task_data["done"] = not self.task_data["done"]
@@ -48,10 +48,16 @@ class TaskApp(App):
     ]
     def compose(self) -> ComposeResult:
         yield Header()
+        
+        yield Input(placeholder="Type task and press Enter", id="task_input")
+        
         yield ListView(id="task_list")
         yield Footer()
     
     def on_mount(self) -> None:
+        input_box = self.query_one("#task_input", Input)
+        input_box.display = False
+        
         list_view = self.query_one("#task_list", ListView)
         tasks = load_tasks()
         for task in tasks:
@@ -61,6 +67,39 @@ class TaskApp(App):
         self.theme = (
             "textual-dark" if self.theme == "textual-light" else "textual-light"
         )
+    
+    def action_add_task(self):
+        input_box = self.query_one("#task_input", Input)
+        input_box.display = True
+        input_box.focus()
+    
+    def on_input_submitted(self, event: Input.Submitted):
+        text = event.value.strip()
+        
+        if not text:
+            return
+            
+        list_view = self.query_one("#task_list", ListView)
+        tasks = [item.task_data for item in list_view.query(TaskItem)]
+        
+        new_id = 1 if not tasks else max(t["id"] for t in tasks) + 1
+        
+        new_task = {
+            "id": new_id,
+            "task": text,
+            "done": False
+        }
+        
+        # list_view.insert(0, [TaskItem(new_task)])
+        list_view.append(TaskItem(new_task))
+        save_tasks(tasks + [new_task])
+        
+        # Hide input again
+        input_box = self.query_one("#task_input", Input)
+        input_box.display = False
+        input_box.value = ""
+        list_view.index = None
+        list_view.focus()
     
     def action_toggle_task(self):
         list_view = self.query_one("#task_list", ListView)
