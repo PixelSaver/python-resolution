@@ -1,5 +1,6 @@
 from textual.app import App, ComposeResult
-from textual.containers import HorizontalGroup, VerticalScroll, Horizontal
+from textual.containers import Grid, Horizontal, Vertical
+from textual.screen import ModalScreen
 from textual.widgets import Input, Button, Static, Footer, Header, ListView, ListItem
 import json
 import os
@@ -30,18 +31,29 @@ class TaskItem(ListItem):
     @property 
     def label_text(self) -> str:
         status = "X" if self.task_data["done"] else " "
-        # Backslash to escape markdown
         return f"[{status}] {self.task_data['id']}: {self.task_data['task']}"
     
     def toggle(self):
         self.task_data["done"] = not self.task_data["done"]
         # Query one is like get_node
         self.query_one("#label", Static).update(self.label_text)
+
+class ConfirmDelete(ModalScreen[bool]):
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Static("Are you sure you want to delete this task?", markup=False),
+            Static(""),
+            Horizontal(Button("Yes", id="yes", variant="error"),Button("No", id="no", variant="primary")),
+            id="dialog",
+        )
         
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "yes")
+
 class TaskApp(App):
     BINDINGS = [
         ("a", "add_task", "Add Task"), 
-        ("d", "mark_done", "Mark Done"), 
+        ("d", "delete", "Delete"), 
         ("D", "toggle_dark", "Toggle dark mode"),
         ("space", "toggle_task", "Toggle"),
         ("q", "quit", "Quit"),
@@ -100,6 +112,21 @@ class TaskApp(App):
         input_box.value = ""
         list_view.index = None
         list_view.focus()
+    
+    def action_delete(self) -> None:
+        list_view = self.query_one("#task_list", ListView)
+        
+        if list_view.highlighted_child is None: 
+            return
+        
+        def check_result(confirmed: bool | None) -> None:
+            if confirmed:
+                selected_item = list_view.highlighted_child
+                if selected_item:
+                    list_view.remove_children([selected_item])
+                    all_tasks = [item.task_data for item in list_view.query(TaskItem)]
+                    save_tasks(all_tasks)
+        self.push_screen(ConfirmDelete(), check_result)
     
     def action_toggle_task(self):
         list_view = self.query_one("#task_list", ListView)
