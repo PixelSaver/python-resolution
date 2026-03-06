@@ -17,13 +17,20 @@ def save_task(tasks):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("task", type=str, nargs="?", help="Task to add")
+parser.add_argument("-l", "--list", action="store_true", help="List all tasks")
 args = parser.parse_args()
 
 if len(sys.argv) == 1:
     parser.print_help(sys.stderr)
     sys.exit(1)
 
-if args.task:
+if args.list:
+    tasks = load_tasks()
+    for task in tasks:
+        status = "x" if task["done"] else " "
+        print(f"{status} {task['id']}: {task['task']}")
+    sys.exit(0)
+elif args.task:
     tasks = load_tasks()
     if len(tasks) == 0:
         new_id = 1
