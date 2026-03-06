@@ -2,6 +2,6 @@
   {
     "id": 1,
     "task": "test task",
-    "done": true
+    "done": false
   }
 ]

@@ -18,24 +18,25 @@ def save_tasks(tasks):
     with open(TASKS_FILE, "w") as f:
         json.dump(tasks, f, indent=2)
 
-class TaskList(ListView):
-    def on_mount(self):
-        self.refresh_tasks()
+class TaskItem(ListItem):
+    def __init__(self, task_data:dict):
+        super().__init__()
+        self.task_data = task_data
     
-    def refresh_tasks(self):
-        self.clear()
-        
-        tasks = load_tasks()
-        
-        if len(tasks) == 0:
-            self.append(ListItem(Static("Press A to add a task")))
-            return
-        
-        for task in tasks:
-            status = "X" if task["done"] else " "
-            row = f"[{status}] {task['id']}: {task['task']}"
-            
-            self.append(ListItem(Static(row)))
+    def compose(self) -> ComposeResult:
+        yield Static(self.label_text, id="label")
+    
+    # Like a godot export property
+    @property 
+    def label_text(self) -> str:
+        status = "X" if self.task_data["done"] else " "
+        # Backslash to escape markdown
+        return f"\[{status}] {self.task_data['id']}: {self.task_data['task']}"
+    
+    def toggle(self):
+        self.task_data["done"] = not self.task_data["done"]
+        # Query one is like get_node
+        self.query_one("#label", Static).update(self.label_text)
         
 class TaskApp(App):
     BINDINGS = [
@@ -47,8 +48,14 @@ class TaskApp(App):
     ]
     def compose(self) -> ComposeResult:
         yield Header()
-        yield TaskList()
+        yield ListView(id="task_list")
         yield Footer()
+    
+    def on_mount(self) -> None:
+        list_view = self.query_one("#task_list", ListView)
+        tasks = load_tasks()
+        for task in tasks:
+            list_view.append(TaskItem(task))
     
     def action_toggle_dark(self) -> None:
         self.theme = (
@@ -56,20 +63,17 @@ class TaskApp(App):
         )
     
     def action_toggle_task(self):
-        list_view = self.query_one(TaskList)
-        if list_view.index is None: 
+        list_view = self.query_one("#task_list", ListView)
+        
+        if list_view.highlighted_child is None: 
             return
         
-        selected_index = list_view.index
-        tasks = load_tasks()
+        selected_item = list_view.highlighted_child
+        if isinstance(selected_item, TaskItem):
+            selected_item.toggle()
         
-        if selected_index < len(tasks):
-            tasks[selected_index]["done"] = not tasks[selected_index]["done"]
-            
-            save_tasks(tasks)
-            list_view.refresh_tasks()
-            
-            list_view.index = selected_index
+            all_tasks = [item.task_data for item in list_view.query(TaskItem)]
+            save_tasks(all_tasks)
     
 if __name__ == "__main__":
     app = TaskApp()
