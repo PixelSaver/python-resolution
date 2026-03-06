@@ -17,6 +17,7 @@ def save_task(tasks):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("task", type=str, nargs="?", help="Task to add")
+parser.add_argument("-c", "--complete", type=int, help="Mark a task as complete by ID")
 parser.add_argument("-l", "--list", action="store_true", help="List all tasks")
 args = parser.parse_args()
 
@@ -30,6 +31,14 @@ if args.list:
         status = "x" if task["done"] else " "
         print(f"{status} {task['id']}: {task['task']}")
     sys.exit(0)
+elif args.complete:
+    tasks = load_tasks()
+    for task in tasks:
+        if task["id"] == args.complete:
+            task["done"] = True
+            save_task(tasks)
+            print(f"Task {args.complete} marked as complete")
+            break
 elif args.task:
     tasks = load_tasks()
     if len(tasks) == 0:
